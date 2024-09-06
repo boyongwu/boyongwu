@@ -196,42 +196,43 @@
                 Sergey Prokudin-Gorsky was Russian photographer, who was known for his effort to document 20th century
                 Russia.
             </p>
-            <p>He traveled Russia and took photos of a wide range of stuff and had the idea to record every scene onto a
-                glass plate with a red, blue and green filter each. </p>
+            <p>He traveled Russia and took photos of a wide range of scenes, objects and people. 
+                Even though this was long before color photography, he had the idea to record every scene onto a glass plate with a red, blue and green filter each. 
+                This way he would capture the red, green and blue channels of a scene seperately. 
+            </p>
             <p>
-                This way he could use a projector with three different colors of lights, and project the three different
+                His plan was to use a projector with three different colors of lights, and project the three different
                 colored image plates
-                on top of each other, to end up with a color image.
+                on top of each other, which would result in a color image.
             </p>
             <p>
                 These RGB glass plates survived and are currently in the possession of the Library of Congress. They have
-                digitized the negatives, which is also what we want to do in this project.
+                digitized the negatives, which is what we are going to use in this project to create the color images out of it.
             </p>
             <ul>
                 <li><a href="#a">1. Single-scale implementation with successful results on low-res images</a></li>
                 <li><a href="#b">2. Multiscale pyramid version that works on large images</a></li>
+                <li><a href="#c">3. My Thoughts on this</a></li>
             </ul>
             <hr class="my-5">
             <a class="anchor" id="a"></a>
             <h3>1. Single-scale implementation with successful results on low-res images</h3>
             <p>
-                In the following I want to walk you through the process of taking the three different color images and
-                aligning them on top of each other correctly to yield a clear color image.
+                In the following I want to walk through the process of taking the three different color images and
+                aligning them on top of each other correctly, to yield a clear color image.
+                We first start with lower resulution images in the first party and then will try our hand on larger, more detailed images.
             </p>
             <h4>1.1 Preparation of the Images</h4>
             <p>
                 We start off with one low resolution jpg images, which are scans of the three different colored glass
-                plates
-                stacked on top of each other.
+                plates stacked on top of each other.
             </p>
             <p>
-                Our first step is just to slice them into 3 separate equal height images, because our goal is to stack
-                them
-                on top of each other.
+                Our first step is to slice them into 3 separate equal height images, so that we can project them on top of each other later.
             </p>
             <p>
                 The first image slice represents the blue glass plate, the second the green and the third the red glass
-                plate
+                plate. 
             </p>
             <p>
                 Just slicing them and stacking them on top does not yield us with a satisfying result, since they are
@@ -246,26 +247,23 @@
             <p>
                 We can compare the intensity values of all the pixels using the NCC, to evaluate whether the images
                 match.
-                To search for a match we could just brute force the search, by np.roll(ing) the image inside a certain
-                range
-                and compare the NCC values.
+                To search for a match we will just brute force the search, by np.roll(ing) the image inside a certain
+                range. This means we first determine a range of x and y values we want to shift our image with, 
+                then we test every pixel shift with the fixed blue image plate and compare the NCC values.
                 It is also possible to use the Euclidean loss, to evaluate whether the images match, but I found out
-                that
-                for our case, NCC yielded better results.
+                that for our case, NCC yielded better results.
             </p>
             <p>
-                One thing we do, before we apply the NCC, is cropping out the corners, since they are a just the border
-                of
-                the glass plates and don't yield us useful information.
-                I have decided to crop out 15% of the image, from the edges.
-                After trying all the possible shifts in our search range, we select the one with the best match, so
-                highest
-                NCC value.
+                One thing we do, before we apply the NCC, is cropping out the corners, since the border
+                of the glass plates don't yield us useful information. The borders don't allign and there is handwriting on them.
+                I have decided to crop out 15% of the image height and width starting from the edges. So the first 7.5% and last 7.5% of 
+                the height and width. This is an empirically derived value. I have introduced this as the 'crop' parameter of my method.
+                I calculated the NCC value of all the possible shifts in our search range, and selected the one with the best match.
             </p>
             <p>
-                As search range I have set 10% of our width and height. So, we are basically shifting our width and
-                height by
-                -5% to 5%, in search of the best intensity match.
+                As test range I have set 10% of our width and height. I am shifting our width and
+                height by -5% to 5% each, in search of the best intensity match. I have introduced this as the 'testrange' hyperparameter
+                of my method.
                 <br>
                 This is our result for the low resolution images:
             </p>
@@ -326,33 +324,31 @@
             <h3>2. Multiscale pyramid version that works on large images</h3>
             <p>
                 Now our goal is to align the large images. Trying our previous method on very large images that have a
-                size
-                of 3700x9700 takes too long.
-                I tried to run it just for fun, even after 20 minutes, there was no result.
+                size of 3700x9700 takes too long.
+                I tried to run it just for fun, but even after 20 minutes, I could not get a result.
 
             </p>
             <h4>2.1 Image Pyramids</h4>
             <p>
-                But what we could do here, is using image pyramids. We basically downscale our image N times and use the
+                What we could do here, is using a image pyramid. We basically downscale our image N times and use the
                 same exact method from before to search for a match.
                 Then we do multiply the optimal shift we found by 2 and use the N-1 downscaled version of our image to
                 finetune our shift.
             </p>
+            <img src="data/Image_pyramid.png" class="d-block mx-lg-auto img-fluid my-2 px-md-5">
             <p>
                 We do that N times to find the optimal shift.
-                To get the optimal result, I have tried different parameters for search ranges (how much should we shift
-                the
-                x and y axis in search of the optimal match),
-                different crops e.g. (what percentage of the image can I crop away, saving compute but still getting good
-                results), and different downscales.
+                To get the optimal result, I have tried different testranges and
+                different crops. The goal was to crop as much as possible away to save compute while still maintaining a good
+                results. I also tried different layers of image pyramids (amount of upscales/downscales)
             </p>
             <h4>2.2 Finetuning variables and optimizations</h4>
             <p>
                 I have received a good result with the following setting:
             </p>
             <p>
-                I scaled the image down 3 times (N=3), used a search range of 0.1 * 0.5 ** (N-Current_Layer) and cropped
-                1-0.6 * 0.5 ** (N-Current_Layer) of the image away.
+                I scaled the image down 3 times (N=3) using a 3 layer image pyramid, used a testrange of testrange = 0.1 * 0.5 ** (N-Current_Layer)
+                and a crop of crop = 1-0.6 * 0.5 ** (N-Current_Layer).
             </p>
             <p>
                 Calculating the NCC value for so many pixels takes a long time on a single thread, which is why I used
@@ -360,7 +356,7 @@
                 This is the result I ended up with:
             </p>
             <p>
-                All the images were pretty good except for the emir image, of the guy sitting in a chair<br>
+                All the images were pretty good except for the emir image, of the old gentleman sitting in a chair<br>
                 I have also provided the displacement of the green and red plates in regard to the blue plate under each
                 image
 
@@ -494,6 +490,17 @@
                     </div>
                 </div>
             </div>
+            <a class="anchor" id="c"></a>
+            <hr class="my-5">
+            <h3>3. My Thoughts on this</h3>
+            <p>
+                While this yields good results, we still have one image, which is not alligned well. Despite using an image pyramid,
+                it is still very compute intensive to compare each individual pixel intensity.
+            </p>
+            <p>
+                To better and more efficiently allign the images we should consider some structural hints like edges, for which we can use
+                the simple sobel operator.
+            </p>
         </div>
 
 
